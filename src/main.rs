@@ -2,9 +2,13 @@ use std::env;
 use std::path::{PathBuf};
 use std::fs;
 use std::io;
+use std::io::Write;
 
 extern crate fs_extra;
 use fs_extra::file;
+
+extern crate regex;
+use regex::Regex;
 
 fn load_args() -> Result<(PathBuf, PathBuf), String> {
     let args: Vec<String> = env::args().collect();
@@ -40,23 +44,70 @@ fn load_xbooks(dir: &PathBuf) -> Result<Vec<PathBuf>, io::Error> {
     Ok(files)
 }
 
-fn move_file(src: &PathBuf, dst: &PathBuf) -> Result<u64, fs_extra::error::Error>{
+fn deploy_xbooks(src_files: &Vec<PathBuf>, dst_dir: &PathBuf) {
+    let xbook_re: Regex = Regex::new(r"^\[(.+)\] .+\.zip$").unwrap();
+    for src_file in src_files {
+        //println!("{}", src_file.display());
+        let fname = src_file.file_name().unwrap().to_string_lossy().into_owned();
+        match xbook_re.captures(fname.as_str()) {
+            Some(caps) => {
+                let mut dst_auther_dir = PathBuf::from(dst_dir);
+                dst_auther_dir.push(caps.get(1).map_or("", |m| m.as_str()));
+
+                let mut dst_file = PathBuf::from(&dst_auther_dir);
+                dst_file.push(src_file.file_name().unwrap());
+
+                if ! dst_auther_dir.is_dir() {
+                    match fs::create_dir(&dst_auther_dir) {
+                        Ok(_) => println!("created dir {}", dst_auther_dir.display()),
+                        Err(e) => println!("{}", e.to_string()),
+                    }
+                }
+
+                let opt = file::CopyOptions::new();
+                match file::move_file(&src_file, &dst_file, &opt) {
+                    Ok(_) => println!("{} -> {}", fname, dst_file.display()),
+                    Err(err) => println!("{}", err.to_string()),
+                }
+            },
+            None => println!("invalid file name format - {}", fname),
+        }
+    }
+}
+
+fn move_file(src: &PathBuf, dst_dir: &PathBuf) {
+    let mut dst = PathBuf::new();
+    dst.push(&dst_dir);
+    dst.push(src.file_name().unwrap());
+
     let opt = file::CopyOptions::new();
-    Ok(file::move_file(src, dst, &opt)?)
+    match file::move_file(&src, &dst, &opt) {
+        Ok(_) => println!("{} -> {}", src.display(), dst.display()),
+        Err(e) => println!("{}", e.to_string()),
+    }
+}
+
+fn press_any_key() -> Result<(), String> {
+    print!("Press any key? ");
+    io::stdout().flush().unwrap();
+    let mut s = String::new();
+    io::stdin().read_line(&mut s).unwrap();
+    Ok(())
 }
 
 fn main() -> Result<(), String>{
-    let (src, dst) = load_args()?;
+    let (src_dir, dst_dir) = load_args()?;
 
-    for src_file in load_xbooks(&src).unwrap() {
-        let mut dst_file = PathBuf::new();
-        dst_file.push(&dst);
-        dst_file.push(src_file.file_name().unwrap());
-        match move_file(&src_file, &dst_file) {
-            Ok(_) => println!("{} -> {}", src_file.display(), dst_file.display()),
-            Err(e) => println!("{}", e.to_string()),
-        }
+    match load_xbooks(&src_dir) {
+        Ok(src_files) => deploy_xbooks(&src_files, &dst_dir),
+        Err(err) => println!("{}", err.to_string()),
     }
+    /*
+    for src_file in load_xbooks(&src_dir).unwrap() {
+        move_file(&src_file, &dst_dir);
+    }
+    */
 
+    //press_any_key()
     Ok(())
 }
