@@ -14,10 +14,10 @@ fn load_args() -> Result<(PathBuf, PathBuf), String> {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
-        Err(String::from("src dir = ?, dst dir = ?"))
+        Err(String::from("invalid option: src dir = ?, dst dir = ?"))
     }
     else if args.len() < 3 {
-        Err(String::from(format!("src dir = {}, dst dir = ?", args[1])))
+        Err(String::from(format!("invalid option: src dir = {}, dst dir = ?", args[1])))
     }
     else {
         let src = PathBuf::from(&args[1]);
@@ -36,7 +36,7 @@ fn load_xbooks(dir: &PathBuf) -> Result<Vec<PathBuf>, io::Error> {
             if let Some(ext) = path.extension() {
                 match ext.to_os_string().into_string() {
                     Ok(s) => if s == "zip" { files.push(path.to_path_buf()); }
-                    Err(e) => println!("{}", e.into_string().unwrap()),
+                    Err(e) => println!("failed to check extension - {} ({})", path.display(), e.into_string().unwrap()),
                 }
             }
         }
@@ -60,14 +60,14 @@ fn deploy_xbooks(src_files: &Vec<PathBuf>, dst_dir: &PathBuf) {
                 if ! dst_auther_dir.is_dir() {
                     match fs::create_dir(&dst_auther_dir) {
                         Ok(_) => println!("created dir {}", dst_auther_dir.display()),
-                        Err(e) => println!("{}", e.to_string()),
+                        Err(e) => println!("failed to create directory - {} ({})", dst_auther_dir.display(), e.to_string()),
                     }
                 }
 
                 let opt = file::CopyOptions::new();
                 match file::move_file(&src_file, &dst_file, &opt) {
                     Ok(_) => println!("{} -> {}", fname, dst_file.display()),
-                    Err(err) => println!("{}", err.to_string()),
+                    Err(err) => println!("failed to move file - {} ({})", src_file.display(), err.to_string()),
                 }
             },
             None => println!("invalid file name format - {}", fname),
@@ -75,6 +75,7 @@ fn deploy_xbooks(src_files: &Vec<PathBuf>, dst_dir: &PathBuf) {
     }
 }
 
+/*
 fn move_file(src: &PathBuf, dst_dir: &PathBuf) {
     let mut dst = PathBuf::new();
     dst.push(&dst_dir);
@@ -86,6 +87,7 @@ fn move_file(src: &PathBuf, dst_dir: &PathBuf) {
         Err(e) => println!("{}", e.to_string()),
     }
 }
+*/
 
 fn press_any_key() -> Result<(), String> {
     print!("Press any key? ");
